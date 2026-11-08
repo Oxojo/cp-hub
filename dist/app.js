@@ -1,8 +1,6 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "cp-training-hub:v1";
-  const stateRank = { NEW: 0, ATTEMPTED: 1, UNKNOWN: 2, LEARNED: 3, SOLVED: 4 };
   const topicOptions = ["Implementation", "Greedy", "DP", "Data Structure", "Graph", "Tree", "Shortest Path", "Math", "Number Theory", "Combinatorics", "Geometry", "Binary Search", "Two Pointers", "Prefix Sum", "Offline"];
   const resultLabels = { NEW: "New", ATTEMPTED: "Attempted", UNKNOWN: "Unknown", LEARNED: "Learned", SOLVED: "Solved" };
   const routeLabels = { today: "Today", week: "Week", problems: "Problems", reviews: "Reviews", contests: "Contests", analytics: "Analytics", settings: "Settings" };
@@ -15,10 +13,7 @@
   let activeReviewTab = "due";
 
   function localDateKey(date = new Date()) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, "0");
-    const d = String(date.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
   }
 
   function fromDateKey(key) {
@@ -61,84 +56,32 @@
     return new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "long", day: "numeric", weekday: "long" }).format(fromDateKey(key));
   }
 
-  function buildSeed() {
-    const today = localDateKey();
-    const week = startOfWeek();
-    const day = (offset) => addDays(week, offset);
-    const p = [
-      ["p1", "https://atcoder.jp/contests/abc390/tasks/abc390_f", "Double Sum 3", "AtCoder", 1700, ["Data Structure", "Offline"], "SOLVED", "各点を値の降順で有効化し、連結成分の寄与だけを差分更新する。"],
-      ["p2", "https://codeforces.com/problemset/problem/2059/C", "Customer Service", "Codeforces", 1600, ["Greedy", "Math"], "LEARNED", "同じコストの状態は現在の最大値が大きい方だけ残せばよい。"],
-      ["p3", "https://atcoder.jp/contests/abc391/tasks/abc391_e", "Hierarchical Majority Vote", "AtCoder", 1400, ["DP", "Tree"], "LEARNED", "木を下から見て、各ノードを反転させる最小コストを子の小さい順に選ぶ。"],
-      ["p4", "https://codeforces.com/problemset/problem/2064/D", "Eating", "Codeforces", 1800, ["Greedy", "Binary Search"], "UNKNOWN", "XOR 後の単調性ではなく、最高位 bit が変わる地点だけを見る。"],
-      ["p5", "https://qoj.ac/problem/9172", "Regional Railway", "QOJ", null, ["Graph", "Shortest Path"], "ATTEMPTED", "状態を駅ではなく最後に使った路線と組にする。"],
-      ["p6", "https://codeforces.com/problemset/problem/2057/C", "Trip to the Olympiad", "Codeforces", 1300, ["Constructive", "Bitwise"], "SOLVED", "区間内で最上位 bit が異なる境界を選び、残りを反転させる。"],
-      ["p7", "https://atcoder.jp/contests/abc389/tasks/abc389_f", "Rated Range", "AtCoder", 1850, ["Data Structure", "Prefix Sum"], "LEARNED", "区間加算と一点取得に加え、境界を二分探索できる構造が必要。"],
-      ["p8", "https://projecteuler.net/problem=886", "Coprime Permutations", "Project Euler", null, ["Math", "DP"], "ATTEMPTED", "値そのものではなく互いに素関係の同型クラスへ圧縮する。"],
-      ["p9", "https://codeforces.com/problemset/problem/2063/B", "Subsequence Update", "Codeforces", 1100, ["Greedy", "Sorting"], "SOLVED", "区間の片側だけから交換候補を取る二通りを独立に試す。"],
-      ["p10", "https://atcoder.jp/contests/abc392/tasks/abc392_f", "Insert", "AtCoder", 1500, ["Data Structure", "Binary Search"], "NEW", ""]
-    ].map(([id, url, title, platform, rating, topics, state, observation]) => ({ id, url, title, platform, rating, topics, state, observation, firstTouchedAt: state === "NEW" ? null : addDays(today, -Math.floor(Math.random() * 18) - 1), failureReasons: state === "UNKNOWN" ? ["Knowledge Gap"] : [] }));
 
-    const todayResults = [
-      ["p1", "SOLVED", "09:21"], ["p2", "LEARNED", "09:44"], ["p3", "LEARNED", "10:05"],
-      ["p4", "UNKNOWN", "10:31"], ["p5", "ATTEMPTED", "11:02"], ["p6", "SOLVED", "11:28"], ["p9", "SOLVED", "12:10"]
-    ];
-    const attempts = todayResults.map(([problemId, result, time], i) => {
-      const problem = p.find((x) => x.id === problemId);
-      return { id: `a_today_${i}`, problemId, result, date: today, time, topics: problem.topics, observation: result === "LEARNED" ? problem.observation : "", slow: problemId === "p1", multipleWa: problemId === "p4", isReview: false };
+  let data = { version: 1, settings: { dailyTarget: 15, weeklyTarget: 80, timezone: 'Asia/Tokyo' }, problems: [], attempts: [], reviews: [], contests: [], events: [] };
+  let revision = 0, pending = Promise.resolve(), serverStatus = null;
+  async function api(path, method = 'GET', body) {
+    const response = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+    return payload;
+  }
+  function accept(payload) { data = payload.state; revision = payload.revision; }
+  function save() {
+    const snapshot = structuredClone(data);
+    pending = pending.then(async () => {
+      accept(await api('/api/state', 'PUT', { state: snapshot, revision }));
+      render();
+    }).catch(async error => {
+      showToast('保存できませんでした', error.message);
+      try { accept(await api('/api/state')); render(); } catch { /* retain state for recovery */ }
     });
-    for (let offset = -6; offset < 0; offset++) {
-      const count = [8, 12, 5, 14, 11, 9][offset + 6];
-      for (let i = 0; i < count; i++) {
-        const problem = p[(i + offset + 12) % p.length];
-        const result = ["SOLVED", "LEARNED", "ATTEMPTED", "SOLVED", "LEARNED"][i % 5];
-        attempts.push({ id: `a_${offset}_${i}`, problemId: problem.id, result, date: addDays(today, offset), time: `${String(9 + (i % 10)).padStart(2, "0")}:${String((i * 7) % 60).padStart(2, "0")}`, topics: problem.topics, observation: result === "LEARNED" ? problem.observation : "", slow: i % 9 === 0, multipleWa: i % 11 === 0, isReview: false });
-      }
-    }
-
-    return {
-      version: 1,
-      settings: { timezone: "Asia/Tokyo", weekStart: "monday", dailyTarget: 10, weeklyTarget: 80, morningTime: "09:00", eveningTime: "23:30", notifyContests: true, discordEnabled: false },
-      problems: p,
-      attempts,
-      reviews: [
-        { id: "r1", problemId: "p2", dueDate: today, stage: 0, trigger: "LEARNED", status: "PENDING" },
-        { id: "r2", problemId: "p4", dueDate: addDays(today, -1), stage: 0, trigger: "UNKNOWN", status: "PENDING" },
-        { id: "r3", problemId: "p1", dueDate: today, stage: 0, trigger: "SLOW_SOLVED", status: "PENDING" },
-        { id: "r4", problemId: "p7", dueDate: addDays(today, 2), stage: 1, trigger: "LEARNED", status: "PENDING" }
-      ],
-      contests: [
-        { id: "c1", date: today, time: "14:35", endTime: "16:35", name: "Repovive Standard Round 10", platform: "Repovive", resource: "repovive", url: "https://repovive.com/", status: "PLANNED", kind: "live" },
-        { id: "c2", date: today, time: "21:00", endTime: "23:00", name: "AtCoder Grand Contest 079", platform: "AtCoder", resource: "atcoder.jp", url: "https://atcoder.jp/", status: "NONE", kind: "live" },
-        { id: "c3", date: day(2), time: "13:00", endTime: "16:00", name: "QOJ ICPC-like Virtual", platform: "QOJ", resource: "qoj.ac", url: "https://qoj.ac/", status: "PLANNED", kind: "virtual" },
-        { id: "c4", date: day(5), time: "14:00", endTime: "19:00", name: "Universal Cup — Stage 22", platform: "UCup", resource: "ucup.ac", url: "https://ucup.ac/", status: "PLANNED", kind: "live" },
-        { id: "c5", date: addDays(today, 3), time: "23:35", endTime: "01:35", name: "Codeforces Round 1064", platform: "Codeforces", resource: "codeforces.com", url: "https://codeforces.com/", status: "NONE", kind: "live" }
-      ],
-      events: [
-        { id: "e1", date: day(0), time: "09:00", name: "Weekend Review + Input", kind: "review", source: "local" },
-        { id: "e2", date: day(1), time: "09:00", name: "High Volume Input", kind: "input", source: "local" },
-        { id: "e3", date: day(2), time: "13:00", name: "QOJ ICPC-like Virtual", kind: "virtual", source: "local" },
-        { id: "e4", date: day(3), time: "09:00", name: "QOJ Review + Input", kind: "review", source: "local" },
-        { id: "e5", date: day(4), time: "18:30", name: "Project Euler", kind: "input", source: "local" },
-        { id: "e6", date: day(5), time: "14:00", name: "UCup Team Practice", kind: "live", source: "local" },
-        { id: "e7", date: day(6), time: "10:00", name: "Light Review / Recovery", kind: "review", source: "local" }
-      ]
-    };
+    return pending;
   }
-
-  function loadState() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-      if (saved?.version === 1 && saved.problems && saved.attempts) return saved;
-    } catch (error) {
-      console.warn("Could not load saved data", error);
-    }
-    const seed = buildSeed();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
-    return seed;
+  async function mutation(path, input) {
+    await pending;
+    accept(await api(path, 'POST', input));
+    closeModal(); render();
   }
-
-  let data = loadState();
-  const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   const problemById = (id) => data.problems.find((p) => p.id === id);
   const dueReviews = () => data.reviews.filter((r) => r.status === "PENDING" && r.dueDate <= localDateKey()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
@@ -162,7 +105,7 @@
     const start = startOfWeek();
     const keys = Array.from({ length: 7 }, (_, i) => addDays(start, i));
     const weekAttempts = data.attempts.filter((a) => keys.includes(a.date) && !a.isReview);
-    const touched = new Set(weekAttempts.map((a) => `${a.date}:${a.problemId}`)).size;
+    const touched = new Set(weekAttempts.filter(a => a.result !== 'SKIPPED' && problemById(a.problemId)?.firstTouchedAt >= keys[0]).map((a) => a.problemId)).size;
     return {
       keys,
       touched,
@@ -258,7 +201,7 @@
             <div class="mini-bars">${bars}</div>
           </section>
 
-          <section class="sync-card card" style="grid-template-columns:8px 1fr;margin:0;color:var(--ink)"><span class="status-dot"></span><div><strong style="color:var(--ink)">Contest sync: demo mode</strong><span>CLIST credentials を接続すると自動同期できます</span></div></section>
+          <section class="sync-card card" style="grid-template-columns:8px 1fr;margin:0;color:var(--ink)"><span class="status-dot"></span><div><strong style="color:var(--ink)">CLIST: ${serverStatus?.clist.configured ? '接続設定済み' : '未設定'}</strong><span>${h(serverStatus?.clist.error || serverStatus?.clist.lastSuccess || 'まだ同期されていません')}</span></div></section>
         </aside>
       </div>`;
   }
@@ -311,7 +254,7 @@
   function renderContests() {
     const contests = [...data.contests].sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
     return `${pageHead("Contest calendar", "Contests", "CLIST 由来の予定と参加記録を一つのリストで管理します。", `<button class="secondary" data-sync-demo>Sync now</button><button class="primary" data-add-event><svg><use href="#i-plus"></use></svg>ローカル予定</button>`)}
-      <div class="toolbar"><div class="toolbar-left"><select class="filter-select"><option>今後90日</option><option>今週</option><option>今日</option></select><select class="filter-select"><option>すべての Resource</option><option>AtCoder</option><option>Codeforces</option><option>QOJ</option><option>UCup</option></select></div><span class="result-count">Contest data provided by CLIST · demo fixture</span></div>
+      <div class="toolbar"><span class="result-count">Contest data provided by CLIST</span><span class="tag">${serverStatus?.clist.lastSuccess ? h(serverStatus.clist.lastSuccess) : '未同期'}</span></div>
       <section class="contest-list">${contests.map((c) => `<article class="card contest-row"><div class="contest-date">${formatDate(c.date, { month: "short", weekday: "short" })}<strong>${fromDateKey(c.date).getDate()}</strong></div><div class="contest-info"><h3>${h(c.name)}</h3><p>${h(c.time)}–${h(c.endTime)} JST · ${h(c.kind.toUpperCase())}</p></div><div class="contest-source"><span>Resource</span><strong>${h(c.resource)}</strong></div><div class="contest-actions">${c.status === "PLANNED" ? `<span class="status-pill planned">参加予定</span>` : `<button class="ghost" data-plan-contest="${c.id}">参加する</button>`}<a class="secondary compact" href="${h(c.url)}" target="_blank" rel="noopener"><svg><use href="#i-external"></use></svg>開く</a><button class="ghost" data-log-contest="${c.id}">結果</button></div></article>`).join("")}</section>`;
   }
 
@@ -343,7 +286,7 @@
       <div class="settings-layout"><nav class="card settings-nav"><button class="is-active">General</button><button>Training plan</button><button>Contest sources</button><button>Discord</button><button>Data</button></nav>
       <section class="card settings-card">
         <div class="settings-section"><h3>General</h3><p>日付境界と週間集計に使う基本設定です。</p>
-          <div class="setting-row"><label>タイムゾーン<span>表示と日次集計に使用</span></label><select data-setting="timezone"><option ${s.timezone === "Asia/Tokyo" ? "selected" : ""}>Asia/Tokyo</option><option>UTC</option><option>America/New_York</option></select></div>
+          <div class="setting-row"><label>タイムゾーン<span>単一 Owner 版は JST 固定</span></label><span class="tag">Asia/Tokyo</span></div>
           <div class="setting-row"><label>日次目標<span>コンテスト予定に応じて調整可能</span></label><input type="number" min="0" max="100" value="${s.dailyTarget}" data-setting="dailyTarget" /></div>
           <div class="setting-row"><label>週間目標<span>New Touched の目標</span></label><input type="number" min="1" max="500" value="${s.weeklyTarget}" data-setting="weeklyTarget" /></div>
         </div>
@@ -352,11 +295,11 @@
           <div class="setting-row"><label>Evening summary<span>未達を理由に追加催促しません</span></label><input type="time" value="${s.eveningTime}" data-setting="eveningTime" /></div>
           <div class="setting-row"><label>Contest reminders<span>60分前 / 10分前</span></label><button class="toggle ${s.notifyContests ? "is-on" : ""}" aria-label="Contest reminder" aria-pressed="${s.notifyContests}" data-toggle-setting="notifyContests"></button></div>
         </div>
-        <div class="settings-section"><h3>Integrations</h3><p>この公開版は秘密情報を保持しない demo mode です。</p>
-          <div class="setting-row"><label>CLIST<span>6時間ごとの同期</span></label><span class="status-pill attempted">Demo fixture</span></div>
-          <div class="setting-row"><label>Discord<span>Daily Input / Quick Action</span></label><span class="status-pill new">Not connected</span></div>
+        <div class="settings-section"><h3>Integrations</h3><p>認証情報はサーバーの環境変数で設定します。</p>
+          <div class="setting-row"><label>CLIST<span>6時間ごとの同期</span></label><span class="status-pill attempted">${serverStatus?.clist.configured ? 'Configured' : 'Not configured'}</span></div>
+          <div class="setting-row"><label>Discord<span>Daily Input / Quick Action</span></label><span class="status-pill new">${serverStatus?.discord.configured ? 'Configured' : 'Not configured'}</span></div>
         </div>
-        <div class="settings-section"><h3>Local data</h3><p>このブラウザに保存されているデモデータを管理します。</p><div class="setting-row"><label>初期状態に戻す<span>問題・attempt・review をすべて再作成</span></label><button class="danger-button" data-reset>デモデータをリセット</button></div></div>
+        <div class="settings-section"><h3>Server data</h3><p>保存先: ${h(serverStatus?.storage || 'server')}。Settings の書き出しボタンで JSON を保存できます。既存の静的版のブラウザデータは自動移行されません。</p></div>
       </section></div>`;
   }
 
@@ -389,74 +332,17 @@
     </form>`, `<button class="secondary" data-close-modal>キャンセル</button><button class="primary" type="submit" form="quickLogForm">Save & Close</button>`, "wide"));
   }
 
-  function canonicalizeUrl(value) {
+
+  async function handleQuickLog(form) {
+    const fields = new FormData(form);
+    const submit = document.querySelector('[form="quickLogForm"][type="submit"]');
+    if (submit?.disabled) return;
+    if (submit) submit.disabled = true;
     try {
-      const url = new URL(value);
-      if (!/^https?:$/.test(url.protocol)) return null;
-      url.hostname = url.hostname.toLowerCase().replace(/^www\./, "");
-      url.hash = "";
-      ["utm_source", "utm_medium", "utm_campaign", "ref"].forEach((key) => url.searchParams.delete(key));
-      url.pathname = url.pathname.replace(/\/$/, "") || "/";
-      return url.toString();
-    } catch {
-      return null;
-    }
-  }
-
-  function platformFromUrl(url) {
-    try {
-      const host = new URL(url).hostname;
-      if (host.includes("atcoder")) return "AtCoder";
-      if (host.includes("codeforces")) return "Codeforces";
-      if (host.includes("qoj")) return "QOJ";
-      if (host.includes("projecteuler")) return "Project Euler";
-      return host.replace(/^www\./, "");
-    } catch { return "Other"; }
-  }
-
-  function scheduleReview(problemId, trigger) {
-    const offsets = { LEARNED: 1, UNKNOWN: 3, SLOW_SOLVED: 7 };
-    const dueDate = addDays(localDateKey(), offsets[trigger] || 1);
-    const existing = data.reviews.find((r) => r.problemId === problemId && r.status === "PENDING");
-    if (existing) {
-      if (dueDate < existing.dueDate) existing.dueDate = dueDate;
-      return;
-    }
-    data.reviews.push({ id: uid("review"), problemId, dueDate, stage: 0, trigger, status: "PENDING" });
-  }
-
-  function handleQuickLog(form) {
-    const fd = new FormData(form);
-    const canonicalUrl = canonicalizeUrl(fd.get("url"));
-    const result = fd.get("result");
-    const observation = String(fd.get("observation") || "").trim();
-    const urlField = document.getElementById("urlField");
-    const observationField = document.getElementById("observationField");
-    urlField.classList.toggle("has-error", !canonicalUrl);
-    observationField.classList.toggle("has-error", result === "LEARNED" && !observation);
-    if (!canonicalUrl || (result === "LEARNED" && !observation)) return;
-
-    const topics = [...form.querySelectorAll("[data-topic].is-active")].map((button) => button.dataset.topic);
-    let problem = data.problems.find((p) => canonicalizeUrl(p.url) === canonicalUrl);
-    if (!problem) {
-      problem = { id: uid("problem"), url: canonicalUrl, title: String(fd.get("title") || "").trim() || new URL(canonicalUrl).pathname.split("/").filter(Boolean).at(-1) || "Untitled Problem", platform: platformFromUrl(canonicalUrl), rating: null, topics, state: "NEW", observation: "", firstTouchedAt: null, failureReasons: [] };
-      data.problems.unshift(problem);
-    }
-    if (String(fd.get("title") || "").trim()) problem.title = String(fd.get("title")).trim();
-    if (topics.length) problem.topics = [...new Set([...(problem.topics || []), ...topics])];
-    if (observation) problem.observation = observation;
-    if (!problem.firstTouchedAt) problem.firstTouchedAt = localDateKey();
-    if (stateRank[result] > stateRank[problem.state]) problem.state = result;
-
-    const now = new Date();
-    data.attempts.push({ id: uid("attempt"), problemId: problem.id, result, date: localDateKey(), time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`, topics, observation, slow: fd.get("slow") === "on", multipleWa: fd.get("multipleWa") === "on", isReview: false });
-    if (result === "LEARNED") scheduleReview(problem.id, "LEARNED");
-    if (result === "UNKNOWN") scheduleReview(problem.id, "UNKNOWN");
-    if (result === "SOLVED" && fd.get("slow") === "on") scheduleReview(problem.id, "SLOW_SOLVED");
-    save();
-    closeModal();
-    render();
-    showToast(`${problem.title} を ${resultLabels[result]} で記録`, result === "LEARNED" ? "翌日の Review Queue に追加しました。" : "今日の進捗を更新しました。");
+      await mutation('/api/v1/attempts', { key: crypto.randomUUID(), url: fields.get('url'), result: fields.get('result'), title: fields.get('title'), observation: fields.get('observation'), topics: [...form.querySelectorAll('[data-topic].is-active')].map(b => b.dataset.topic), slow: fields.get('slow') === 'on', multipleWa: fields.get('multipleWa') === 'on' });
+      showToast('記録を保存しました', 'Web と Discord で同じ記録を使用します。');
+    } catch (error) { showToast('保存できませんでした', error.message); if (submit) submit.disabled = false; }
+    return;
   }
 
   function openReview(reviewId) {
@@ -466,31 +352,15 @@
     openModal(modalShell("Review", `Stage ${review.stage + 1} · ${review.trigger.replaceAll("_", " ")}`, `<div class="review-modal-hero"><span class="review-index">05:00</span><h3>${h(p.title)}</h3><p>問題文だけを見て、解法の核心を5分以内に再構築できますか？ Observation は回答するまで隠されています。</p><a class="secondary compact" style="margin-top:15px" href="${h(p.url)}" target="_blank" rel="noopener"><svg><use href="#i-external"></use></svg>問題を開く</a></div><div id="reviewObservation"></div><div class="review-answer-actions"><button class="primary" data-review-answer="remembered" data-review-target="${review.id}">Remembered<small>次の stage へ</small></button><button class="secondary" data-review-answer="forgot" data-review-target="${review.id}">Forgot<small>Observation を表示</small></button><button class="secondary" data-review-answer="unknown" data-review-target="${review.id}">Still Unknown<small>3日後に再確認</small></button></div>`, "", "small"));
   }
 
-  function answerReview(reviewId, answer) {
-    const review = data.reviews.find((r) => r.id === reviewId);
-    if (!review) return;
-    const p = problemById(review.problemId);
-    if (answer === "forgot") {
-      const slot = document.getElementById("reviewObservation");
-      slot.innerHTML = `<div class="review-observation"><span>Key Observation</span><p>${h(p.observation || "Observation はまだ記録されていません。")}</p></div>`;
-      review.stage = 0;
-      review.dueDate = addDays(localDateKey(), 1);
-    } else if (answer === "unknown") {
-      review.dueDate = addDays(localDateKey(), 3);
-      if (stateRank.UNKNOWN > stateRank[p.state]) p.state = "UNKNOWN";
-    } else if (review.trigger === "SLOW_SOLVED" || review.stage >= 2) {
-      review.status = "COMPLETED";
-      review.completedAt = localDateKey();
-    } else {
-      const intervals = [7, 21];
-      review.dueDate = addDays(localDateKey(), intervals[review.stage] || 21);
-      review.stage += 1;
-    }
-    data.attempts.push({ id: uid("reviewevent"), problemId: p.id, result: `REVIEW_${answer.toUpperCase()}`, date: localDateKey(), time: new Date().toTimeString().slice(0, 5), topics: p.topics, observation: "", slow: false, multipleWa: false, isReview: true });
-    save();
-    if (answer !== "forgot") closeModal();
-    render();
-    showToast("復習結果を記録しました", answer === "remembered" ? "次の復習間隔へ進みます。" : answer === "forgot" ? "Observation を確認し、明日もう一度試します。" : "3日後にもう一度確認します。");
+  async function answerReview(reviewId, answer) {
+    document.querySelectorAll('[data-review-answer]').forEach(button => { button.disabled = true; });
+    const problem = problemById(data.reviews.find(r => r.id === reviewId)?.problemId);
+    try {
+      await mutation('/api/v1/reviews', { id: reviewId, answer, key: crypto.randomUUID() });
+      if (answer === 'forgot') openModal(modalShell('Key Observation', '明日もう一度確認します。', `<p>${h(problem?.observation || 'Observation は未記録です。')}</p>`, '<button class="primary" data-close-modal>確認しました</button>', 'small'));
+      showToast('復習を保存しました', '次回期限をサーバーで更新しました。');
+    } catch (error) { showToast('保存できませんでした', error.message); document.querySelectorAll('[data-review-answer]').forEach(button => { button.disabled = false; }); }
+    return;
   }
 
   function openProblemDetail(problemId) {
@@ -558,7 +428,7 @@
     const answerButton = event.target.closest("[data-review-answer]");
     if (answerButton) { answerReview(answerButton.dataset.reviewTarget, answerButton.dataset.reviewAnswer); return; }
     const postpone = event.target.closest("[data-postpone-review]");
-    if (postpone) { const review = data.reviews.find((r) => r.id === postpone.dataset.postponeReview); review.dueDate = addDays(review.dueDate, 1); save(); render(); showToast("復習を1日延期しました", "Review Queue の期限を更新しました。"); return; }
+    if (postpone) { mutation('/api/v1/reviews/postpone', { id: postpone.dataset.postponeReview }).then(() => showToast('復習を延期しました', '期限を1日後に更新しました。')).catch(e => showToast('保存できませんでした', e.message)); return; }
     const tab = event.target.closest("[data-review-tab]");
     if (tab) { activeReviewTab = tab.dataset.reviewTab; render(); return; }
     if (event.target.closest("[data-start-review]")) { const review = dueReviews()[0]; review ? openReview(review.id) : showToast("復習は完了しています", "今日の Review Queue は空です。"); return; }
@@ -567,7 +437,7 @@
     if (plan) { const c = data.contests.find((x) => x.id === plan.dataset.planContest); c.status = "PLANNED"; save(); render(); showToast("参加予定に追加しました", `${c.name} の通知対象になります。`); return; }
     const logContest = event.target.closest("[data-log-contest]");
     if (logContest) { openContestLog(logContest.dataset.logContest); return; }
-    if (event.target.closest("[data-sync-demo]")) { showToast("デモデータを確認しました", "本番同期には CLIST credentials と server worker が必要です。"); return; }
+    if (event.target.closest("[data-sync-demo]")) { api('/api/v1/clist/sync', 'POST', {}).then(() => showToast('同期を開始しました', '取得完了後に再読み込みすると予定へ反映されます。')).catch(e => showToast('同期できませんでした', e.message)); return; }
     const toggle = event.target.closest("[data-toggle-setting]");
     if (toggle) { const key = toggle.dataset.toggleSetting; data.settings[key] = !data.settings[key]; save(); render(); showToast("設定を保存しました", "このブラウザに反映されています。"); return; }
     if (event.target.closest("[data-export]")) {
@@ -575,7 +445,7 @@
       const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `training-hub-${localDateKey()}.json`; a.click(); URL.revokeObjectURL(url); showToast("データを書き出しました", "Problems / attempts / reviews / contests を含む JSON です。"); return;
     }
     if (event.target.closest("[data-reset]")) {
-      if (confirm("このブラウザのデモデータを初期状態に戻しますか？")) { data = buildSeed(); save(); render(); showToast("デモデータをリセットしました", "初期状態からもう一度試せます。"); }
+      showToast('サーバーデータは保持されます', 'リセットは管理者によるバックアップと DB 操作で行ってください。');
     }
   });
 
@@ -595,7 +465,7 @@
   });
 
   document.addEventListener("input", (event) => {
-    if (event.target.id === "problemSearch") { window.problemQuery = event.target.value; render(); document.getElementById("problemSearch")?.focus(); }
+    if (event.target.id === "problemSearch") { const position=event.target.selectionStart; window.problemQuery = event.target.value; render(); const input=document.getElementById("problemSearch"); input?.focus(); input?.setSelectionRange(position,position); }
     if (event.target.id === "globalSearchInput") document.getElementById("globalSearchResults").innerHTML = searchResults(event.target.value);
   });
 
@@ -623,5 +493,17 @@
     if (routeLabels[next] && next !== currentRoute) { currentRoute = next; render(); }
   });
 
-  render();
+  async function boot() {
+    app.innerHTML = '<p>サーバーへ接続しています…</p>';
+    try {
+      accept(await api('/api/state'));
+      serverStatus = await api('/api/status');
+      render();
+      document.querySelector('.sync-card div span').textContent = serverStatus.clist.configured ? 'CLIST configured' : 'CLIST not configured';
+    } catch (error) {
+      app.innerHTML = `<section class="card settings-card"><h2>Owner ログイン</h2><p class="page-subtitle">サーバーの OWNER_PASSWORD を入力してください。</p><form id="loginForm" class="form-grid" style="margin-top:20px"><div class="form-field full"><label for="ownerPassword">Password</label><input id="ownerPassword" type="password" autocomplete="current-password" required /></div><button class="primary">ログイン</button></form><p>${h(error.message)}</p></section>`;
+      document.getElementById('loginForm').addEventListener('submit', async event => { event.preventDefault(); try { await api('/api/login', 'POST', { password: document.getElementById('ownerPassword').value }); await boot(); } catch (e) { showToast('ログインできませんでした', e.message); } });
+    }
+  }
+  void boot();
 })();

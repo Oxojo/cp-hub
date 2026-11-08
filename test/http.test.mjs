@@ -1,0 +1,30 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { buildServer } from '../server/index.mjs';
+
+test('HTTP authentication, CSRF, authoritative attempts and stale revision', async t => {
+  await mkdir('data',{recursive:true});const dir=await mkdtemp(join(process.cwd(),'data','cp-hub-http-'));
+  const {server,store}=await buildServer({DATA_FILE:join(dir,'state.json'),OWNER_PASSWORD:'test-only-password',APP_ORIGIN:'http://127.0.0.1'});
+  await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+  t.after(async()=>{await new Promise(resolve=>server.close(resolve));await store.close();await rm(dir,{recursive:true,force:true});});
+  const base=`http://127.0.0.1:${server.address().port}`;
+  assert.equal((await fetch(base+'/api/state')).status,401);
+  const bad=await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:'wrong'})}); assert.equal(bad.status,401);
+  const login=await fetch(base+'/api/login',{method:'POST',body:JSON.stringify({password:'test-only-password'})});assert.equal(login.status,200);
+  const cookie=login.headers.get('set-cookie').split(';')[0];const headers={Cookie:cookie,'Content-Type':'application/json'};
+  const initial=await (await fetch(base+'/api/state',{headers})).json();
+  assert.equal((await fetch(base+'/api/v1/attempts',{method:'POST',headers:{...headers,Origin:'https://evil.example'},body:'{}'})).status,403);
+  const input={url:'https://qoj.ac/problem/123',result:'LEARNED',observation:'A key observation',key:'same'};
+  const attempt=await (await fetch(base+'/api/v1/attempts',{method:'POST',headers,body:JSON.stringify(input)})).json();
+  assert.equal(attempt.state.attempts.length,1);assert.equal(attempt.state.reviews.length,1);
+  const repeat=await (await fetch(base+'/api/v1/attempts',{method:'POST',headers,body:JSON.stringify(input)})).json();
+  assert.equal(repeat.revision,attempt.revision);assert.equal(repeat.state.attempts.length,1);
+  assert.equal((await fetch(base+'/api/state',{method:'PUT',headers,body:JSON.stringify(initial)})).status,409);
+  const fresh=await (await fetch(base+'/api/state',{headers})).json();fresh.state.attempts=[];fresh.state.settings.dailyTarget=20;
+  const saved=await (await fetch(base+'/api/state',{method:'PUT',headers,body:JSON.stringify(fresh)})).json();
+  assert.equal(saved.state.attempts.length,1);assert.equal(saved.state.settings.dailyTarget,20);
+  assert.equal((await fetch(base+'/api/discord/interactions',{method:'POST',body:'{}'})).status,401);
+  assert.equal((await fetch(base+'/')).status,200);
+});

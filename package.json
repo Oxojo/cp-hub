@@ -4,9 +4,13 @@
   "private": true,
   "description": "Competitive programming training dashboard",
   "scripts": {
-    "start": "node scripts/serve.mjs",
-    "dev": "node scripts/serve.mjs",
-    "check": "node --check dist/app.js && node --check scripts/serve.mjs"
+    "start": "node --env-file-if-exists=.env server/index.mjs",
+    "dev": "node --env-file-if-exists=.env server/index.mjs",
+    "worker": "node --env-file-if-exists=.env server/worker.mjs",
+    "discord:register": "node --env-file-if-exists=.env scripts/register-discord.mjs",
+    "test": "node --test test/*.test.mjs",
+    "check": "node --check dist/app.js && node --check server/index.mjs && node --check server/discord.mjs"
   },
-  "engines": { "node": ">=22" }
+  "engines": { "node": ">=22.9" },
+  "dependencies": { "pg": "^8.16.3" }
 }
