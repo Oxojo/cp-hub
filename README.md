@@ -1,5 +1,7 @@
 # CP Hub
 
+VPS で main を自動反映する設定は [自動デプロイ手順](docs/auto-deploy.md) を参照してください。
+
 競技プログラミングの予定・問題記録・復習を Web と Discord から共有する単一 Owner 向けアプリです。Node.js API、PostgreSQL 保存、CLIST 同期、Discord HTTP Interactions Bot と通知 worker を追加しています。
 
 ## 起動

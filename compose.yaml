@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:17
+    restart: unless-stopped
     environment:
       POSTGRES_DB: cphub
       POSTGRES_USER: cphub
@@ -13,6 +14,7 @@ services:
       retries: 10
   web:
     build: .
+    restart: unless-stopped
     env_file: .env
     environment:
       HOST: 0.0.0.0

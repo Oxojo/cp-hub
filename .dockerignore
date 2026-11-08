@@ -4,3 +4,7 @@ node_modules
 .env.*
 data
 outputs
+.deploy
+backups
+compose.override.yaml
+compose.override.yml
