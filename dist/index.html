@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#101820" />
+    <meta
+      name="description"
+      content="競技プログラミングの予定、問題記録、復習、分析を一つにつなぐトレーニングハブ"
+    />
+    <title>Training Hub — Competitive Programming</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <svg class="svg-defs" aria-hidden="true">
+      <symbol id="i-today" viewBox="0 0 24 24"><path d="M5 4.8h14a1.8 1.8 0 0 1 1.8 1.8v12A1.8 1.8 0 0 1 19 20.4H5a1.8 1.8 0 0 1-1.8-1.8v-12A1.8 1.8 0 0 1 5 4.8Z"/><path d="M7.2 2.8v4M16.8 2.8v4M3.2 9h17.6"/><path d="m8.1 14.2 2.2 2.2 5-5"/></symbol>
+      <symbol id="i-week" viewBox="0 0 24 24"><rect x="3.2" y="4.3" width="17.6" height="16" rx="1.8"/><path d="M7 2.8v3M17 2.8v3M3.2 8.4h17.6M8.7 8.4v11.9M15.3 8.4v11.9M3.2 14.4h17.6"/></symbol>
+      <symbol id="i-problems" viewBox="0 0 24 24"><path d="M5.3 3.4h13.4a1.7 1.7 0 0 1 1.7 1.7v13.8a1.7 1.7 0 0 1-1.7 1.7H5.3a1.7 1.7 0 0 1-1.7-1.7V5.1a1.7 1.7 0 0 1 1.7-1.7Z"/><path d="M8 8h8M8 12h5M8 16h3"/></symbol>
+      <symbol id="i-review" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 1-2.3-5.7"/><path d="M20 4v7h-7M12 7.5V12l3 2"/></symbol>
+      <symbol id="i-contests" viewBox="0 0 24 24"><path d="M8 4h8v4.7A4 4 0 0 1 12 13a4 4 0 0 1-4-4.3V4Z"/><path d="M8 6H4v2a4 4 0 0 0 4.6 4M16 6h4v2a4 4 0 0 1-4.6 4M12 13v4M8.5 20h7M10 17h4"/></symbol>
+      <symbol id="i-analytics" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20V7"/><path d="M2 20h21"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.8a7.8 7.8 0 0 0 0-3.6l2-1.5-2-3.4-2.4 1a8.2 8.2 0 0 0-3.1-1.8L13.2 2h-4l-.4 2.5a8.2 8.2 0 0 0-3.1 1.8l-2.4-1-2 3.4 2 1.5a7.8 7.8 0 0 0 0 3.6l-2 1.5 2 3.4 2.4-1a8.2 8.2 0 0 0 3.1 1.8l.4 2.5h4l.4-2.5a8.2 8.2 0 0 0 3.1-1.8l2.4 1 2-3.4-2.1-1.5Z"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.6" cy="10.6" r="6.6"/><path d="m15.6 15.6 5 5"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M13 5h6v6M19 5l-8 8"/><path d="M17 13v5a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 18V8.5A1.5 1.5 0 0 1 6 7h5"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    </svg>
+
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="メインナビゲーション">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true"><span>&lt;</span><b>/</b><span>&gt;</span></div>
+          <div class="brand-copy"><strong>Training Hub</strong><span>Competitive Programming</span></div>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item is-active" data-route="today"><svg><use href="#i-today"></use></svg><span>Today</span><kbd>1</kbd></button>
+          <button class="nav-item" data-route="week"><svg><use href="#i-week"></use></svg><span>Week</span><kbd>2</kbd></button>
+          <button class="nav-item" data-route="problems"><svg><use href="#i-problems"></use></svg><span>Problems</span><kbd>3</kbd></button>
+          <button class="nav-item" data-route="reviews"><svg><use href="#i-review"></use></svg><span>Reviews</span><b class="nav-badge" id="reviewNavBadge">0</b></button>
+          <button class="nav-item" data-route="contests"><svg><use href="#i-contests"></use></svg><span>Contests</span></button>
+          <button class="nav-item" data-route="analytics"><svg><use href="#i-analytics"></use></svg><span>Analytics</span></button>
+          <button class="nav-item" data-route="settings"><svg><use href="#i-settings"></use></svg><span>Settings</span></button>
+        </nav>
+
+        <div class="sidebar-foot">
+          <div class="sync-card">
+            <span class="status-dot"></span>
+            <div><strong>CLIST sync</strong><span>Demo data · local</span></div>
+          </div>
+          <div class="profile-chip">
+            <span class="avatar">YK</span>
+            <div><strong>Owner</strong><span>Asia/Tokyo</span></div>
+            <span class="online-dot" aria-label="オンライン"></span>
+          </div>
+        </div>
+      </aside>
+
+      <div class="main-column">
+        <header class="topbar">
+          <button class="icon-button menu-button" id="menuButton" aria-label="メニューを開く"><svg><use href="#i-menu"></use></svg></button>
+          <div class="topbar-breadcrumb"><span>Training Hub</span><b>/</b><strong id="breadcrumb">Today</strong></div>
+          <div class="topbar-actions">
+            <button class="search-command" id="globalSearchButton"><svg><use href="#i-search"></use></svg><span>問題・Observation を検索</span><kbd>/</kbd></button>
+            <button class="primary compact" data-open-quick-log><svg><use href="#i-plus"></use></svg><span>Quick Log</span></button>
+          </div>
+        </header>
+
+        <main id="app" tabindex="-1"></main>
+      </div>
+    </div>
+
+    <nav class="mobile-nav" aria-label="モバイルナビゲーション">
+      <button class="is-active" data-route="today"><svg><use href="#i-today"></use></svg><span>Today</span></button>
+      <button data-route="problems"><svg><use href="#i-problems"></use></svg><span>Problems</span></button>
+      <button data-route="reviews"><svg><use href="#i-review"></use></svg><span>Reviews</span><b id="mobileReviewBadge">0</b></button>
+      <button data-route="more"><svg><use href="#i-menu"></use></svg><span>More</span></button>
+    </nav>
+
+    <div class="modal-layer" id="modalLayer" aria-live="polite"></div>
+    <div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+    <div class="sidebar-scrim" id="sidebarScrim"></div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>

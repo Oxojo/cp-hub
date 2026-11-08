@@ -1,0 +1,12 @@
+{
+  "name": "cp-hub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Competitive programming training dashboard",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "dev": "node scripts/serve.mjs",
+    "check": "node --check dist/app.js && node --check scripts/serve.mjs"
+  },
+  "engines": { "node": ">=22" }
+}
