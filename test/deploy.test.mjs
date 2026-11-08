@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, readFile, writeFile, copyFile, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 const shell = process.env.CP_HUB_TEST_BASH || (process.platform === 'win32' ? null : '/bin/bash');
@@ -57,7 +58,8 @@ async function fixture(t, options = {}) {
 
 test('deploy scripts have valid Bash syntax', {skip:!shell}, () => {
   for(const file of ['deploy-main.sh','install-auto-deploy.sh']) {
-    const result=spawnSync(shell,['-n',toBash(resolve('scripts',file))],{encoding:'utf8'});
+    const script = fileURLToPath(new URL(`../scripts/${file}`, import.meta.url));
+    const result=spawnSync(shell,['-n',toBash(script)],{encoding:'utf8'});
     assert.equal(result.status,0,result.stderr);
   }
 });
@@ -89,3 +91,4 @@ test('local tracked changes block automatic update', {skip:!shell}, async t => {
   const f=await fixture(t,{MOCK_DIRTY:'1'}),result=f.run();assert.notEqual(result.status,0,result.stdout);
   await assert.rejects(readFile(join(f.root,'.calls')));
 });
+
