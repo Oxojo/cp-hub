@@ -25,6 +25,15 @@ test('HTTP authentication, CSRF, authoritative attempts and stale revision', asy
   const fresh=await (await fetch(base+'/api/state',{headers})).json();fresh.state.attempts=[];fresh.state.settings.dailyTarget=20;
   const saved=await (await fetch(base+'/api/state',{method:'PUT',headers,body:JSON.stringify(fresh)})).json();
   assert.equal(saved.state.attempts.length,1);assert.equal(saved.state.settings.dailyTarget,20);
+  assert.equal((await fetch(base+'/api/v1/problems/stock',{method:'POST',body:JSON.stringify({urls:['https://example.com/problem']})})).status,401);
+  const stocked=await (await fetch(base+'/api/v1/problems/stock',{method:'POST',headers,body:JSON.stringify({urls:['https://atcoder.jp/contests/abc001/tasks/abc001_1'],queueToday:true,source:'HTTP test'})})).json();
+  assert.equal(stocked.result.added,1);assert.equal(stocked.state.attempts.length,1);
+  const id=stocked.result.ids[0];
+  const edited=await (await fetch(base+'/api/v1/problems/'+id,{method:'PATCH',headers,body:JSON.stringify({title:'Updated problem',difficulty:'EASY',rating:800,topics:['Greedy']})})).json();
+  assert.equal(edited.state.problems.find(p=>p.id===id).difficulty,'EASY');
+  assert.equal((await fetch(base+'/api/v1/problems/'+id,{method:'PATCH',headers,body:JSON.stringify({rating:-10})})).status,400);
+  const removed=await (await fetch(base+'/api/v1/queue',{method:'POST',headers,body:JSON.stringify({action:'remove',problemId:id})})).json();
+  assert.equal(Object.values(removed.state.problemQueues)[0].length,0);assert.equal(removed.state.problems.find(p=>p.id===id).title,'Updated problem');
   assert.equal((await fetch(base+'/api/discord/interactions',{method:'POST',body:'{}'})).status,401);
   assert.equal((await fetch(base+'/')).status,200);
 });

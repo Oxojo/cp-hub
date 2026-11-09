@@ -80,6 +80,10 @@ delivery key・lease・Discord nonce・最大5回の再試行を使用します�
 
 ## API
 
+Problems の「URL をストック」から最大100件を一括登録できます。Topic、難易度、Rating、出典は登録時または編集画面で設定します。「今日に追加」で JST の当日キューへ入れ、上下ボタンで順番を変更できます。登録とキューへの追加は Touched に加算せず、Quick Log の記録でキューの状態を更新します。Discord の /problems も当日キューを優先します。
+
+Discord のメッセージから登録するには、更新後に VPS で `sudo docker compose exec web npm run discord:register` を一度実行します。リンクを含むメッセージを右クリックして **Apps → ストックに追加** を選びます。[Discord のメッセージコマンド](https://docs.discord.com/developers/interactions/application-commands#message-commands)
+
 Owner session が必要です。ローカルでパスワード未設定の場合だけ loopback を Owner と扱います。
 
 | Endpoint | 用途 |
@@ -90,6 +94,9 @@ Owner session が必要です。ローカルでパスワード未設定の場合
 | GET /api/status | 外部連携と通知の状態 |
 | GET /api/v1/today | 日次進捗 |
 | POST /api/v1/attempts | url / result / observation / key |
+| POST /api/v1/problems/stock | URL の一括ストックと当日キューへの追加 |
+| PATCH /api/v1/problems/:id | 問題名・分類・アーカイブ設定を編集 |
+| POST /api/v1/queue | 当日キューへの追加・並べ替え・取り外し |
 | POST /api/v1/reviews | id / answer / key |
 | POST /api/v1/reviews/postpone | id の期限を1日延期 |
 | POST /api/v1/clist/sync | 同期開始 |

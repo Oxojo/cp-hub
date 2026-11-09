@@ -8,6 +8,7 @@ import { createClistSync } from './clist.mjs';
 import { discordInteraction, verifyDiscord } from './discord.mjs';
 import { progress, recordAttempt, recordReview } from './domain.mjs';
 import { runJobs } from './jobs.mjs';
+import { stockProblems, editProblem, updateQueue } from './problems.mjs';
 
 export async function buildServer(env = process.env, suppliedStore) {
   const store = suppliedStore || await createStore(env);
@@ -55,6 +56,17 @@ export async function buildServer(env = process.env, suppliedStore) {
         if (req.method === 'GET' && path === '/api/state') return json(res,200,await store.transaction(d=>({state:d.state,revision:d.revision})));
         if (req.method === 'GET' && path === '/api/status') return json(res,200,await store.transaction(d=>({storage:store.mode,clist:{configured:!!env.CLIST_API_KEY,...d.internal.clist},discord:{configured:!!(env.DISCORD_PUBLIC_KEY && env.DISCORD_OWNER_ID),channelConfigured:!!(d.internal.discordChannel || env.DISCORD_CHANNEL_ID)},deliveries:Object.values(d.internal.deliveries).filter(d=>d.status==='FAILED').length})));
         if (req.method === 'GET' && path === '/api/v1/today') return json(res,200,await store.transaction(d=>progress(d.state)));
+        if (req.method === 'POST' && ['/api/v1/problems/stock','/api/v1/queue'].includes(path)) {
+          const input=JSON.parse(await rawBody(req));
+          const payload=await store.transaction(d=>({result:path.endsWith('/stock')?stockProblems(d.state,input):updateQueue(d.state,input),state:d.state}));
+          return json(res,200,payload);
+        }
+        const problemMatch=path.match(/^\/api\/v1\/problems\/([^/]+)$/);
+        if (req.method === 'PATCH' && problemMatch) {
+          const input=JSON.parse(await rawBody(req));
+          const payload=await store.transaction(d=>({result:editProblem(d.state,problemMatch[1],input),state:d.state}));
+          return json(res,200,payload);
+        }
         if (req.method === 'POST' && path === '/api/v1/clist/sync') {
           if (!env.CLIST_USERNAME || !env.CLIST_API_KEY) return json(res,503,{error:'CLIST credentials not configured'});
           void sync().catch(()=>{}); return json(res,202,{message:'Sync started'});

@@ -9,7 +9,7 @@
     "worker": "node --env-file-if-exists=.env server/worker.mjs",
     "discord:register": "node --env-file-if-exists=.env scripts/register-discord.mjs",
     "test": "node --test test/*.test.mjs",
-    "check": "node --check dist/app.js && node --check server/index.mjs && node --check server/discord.mjs"
+    "check": "node --check dist/app.js && node --check dist/stock.js && node --check server/index.mjs && node --check server/discord.mjs && node --check server/problems.mjs"
   },
   "engines": { "node": ">=22.9" },
   "dependencies": { "pg": "^8.16.3" }

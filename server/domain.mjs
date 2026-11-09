@@ -12,8 +12,14 @@ export function emptyState() {
 export function canonicalUrl(value) {
   const u = new URL(value);
   if (!['http:', 'https:'].includes(u.protocol)) throw new Error('HTTP(S) URL required');
+  if (u.username || u.password) throw new Error('Credentials in URL are not allowed');
   u.hostname = u.hostname.replace(/^www\./, ''); u.hash = '';
   for (const k of [...u.searchParams.keys()]) if (k.startsWith('utm_') || k === 'ref') u.searchParams.delete(k);
+  if (u.hostname === 'atcoder.jp') u.searchParams.delete('lang');
+  if (u.hostname === 'codeforces.com') {
+    const match=u.pathname.match(/^\/contest\/(\d+)\/problem\/([A-Za-z0-9]+)\/?$/);
+    if(match) u.pathname=`/problemset/problem/${match[1]}/${match[2]}`;
+  }
   u.pathname = u.pathname.replace(/\/$/, '') || '/'; return u.href;
 }
 const rank = { NEW: 0, ATTEMPTED: 1, UNKNOWN: 2, LEARNED: 3, SOLVED: 4 };
@@ -35,6 +41,8 @@ export function recordAttempt(s, input, now = new Date()) {
   const topics = Array.isArray(input.topics) ? input.topics.slice(0, 20).map(t => String(t).slice(0, 60)) : [];
   const a = { id: randomUUID(), key: input.key, sessionId: input.sessionId || date, problemId: p.id, result, date, time: now.toISOString().slice(11, 16), topics, observation, slow: !!input.slow, multipleWa: !!input.multipleWa, isReview: false, at: now.toISOString() };
   s.attempts.push(a);
+  const queued = s.problemQueues?.[date]?.find(e=>e.problemId===p.id);
+  if (queued) { queued.status=result==='SKIPPED'?'SKIPPED':result==='ATTEMPTED'?'THINKING':'DONE'; queued.result=result; }
   if (result === 'SKIPPED') return a;
   if (rank[result] > rank[p.state]) p.state = result;
   p.firstTouchedAt ||= date;

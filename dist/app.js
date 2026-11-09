@@ -77,11 +77,21 @@
     });
     return pending;
   }
-  async function mutation(path, input) {
-    await pending;
-    accept(await api(path, 'POST', input));
-    closeModal(); render();
+  function mutation(path, input, method='POST') {
+    const operation=pending.then(async()=>{
+      const payload=await api(path, method, input);
+      accept(payload);closeModal();render();return payload;
+    });
+    pending=operation.catch(()=>{});
+    return operation;
   }
+  const stockUI = window.createStockUI({
+    getState: () => data,
+    request: mutation,
+    modal: (title, subtitle, body, footer) => openModal(modalShell(title, subtitle, body, footer, 'wide')),
+    notify: showToast,
+    refresh: render
+  });
   const problemById = (id) => data.problems.find((p) => p.id === id);
   const dueReviews = () => data.reviews.filter((r) => r.status === "PENDING" && r.dueDate <= localDateKey()).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
@@ -175,6 +185,7 @@
             <div class="mission-actions"><button class="primary" data-open-quick-log><svg><use href="#i-play"></use></svg>Start Training</button><button class="secondary" data-start-review><svg><use href="#i-review"></use></svg>Review ${reviews.length}</button></div>
           </section>
 
+          ${stockUI.renderQueue(true)}
           <section class="metric-grid" aria-label="今日の進捗">
             ${[["Touched", stats.touched, target], ["Solved", stats.solved, "today"], ["Learned", stats.learned, "today"], ["Unknown", stats.unknown, "today"], ["Observations", stats.observations, "new"]].map(([label, value, unit]) => `<article class="metric"><div class="metric-top"><i class="metric-dot"></i>${label}</div><div class="metric-value"><strong>${value}</strong><span>${unit}</span></div></article>`).join("")}
           </section>
@@ -227,19 +238,7 @@
       </div>`;
   }
 
-  function renderProblems() {
-    const query = window.problemQuery || "";
-    const filter = window.problemFilter || "ALL";
-    const topic = window.topicFilter || "ALL";
-    const normalized = query.toLowerCase();
-    const problems = data.problems.filter((p) => {
-      const searchable = [p.title, p.url, p.platform, p.observation, ...(p.topics || []), ...(p.failureReasons || [])].join(" ").toLowerCase();
-      return (!normalized || searchable.includes(normalized)) && (filter === "ALL" || p.state === filter) && (topic === "ALL" || p.topics.includes(topic));
-    });
-    return `${pageHead("Knowledge base", "Problems", "問題・Observation・Topic を横断検索し、接触履歴を振り返ります。", `<button class="primary" data-open-quick-log><svg><use href="#i-plus"></use></svg>問題を記録</button>`)}
-      <div class="toolbar"><div class="toolbar-left"><label class="field-inline"><span class="sr-only">問題を検索</span><svg><use href="#i-search"></use></svg><input id="problemSearch" value="${h(query)}" placeholder="問題名・URL・Observation を検索" autocomplete="off" /></label><select id="problemStatusFilter" class="filter-select"><option value="ALL">すべての状態</option>${["SOLVED", "LEARNED", "ATTEMPTED", "UNKNOWN", "NEW"].map((x) => `<option ${filter === x ? "selected" : ""} value="${x}">${resultLabels[x]}</option>`).join("")}</select><select id="problemTopicFilter" class="filter-select"><option value="ALL">すべての Topic</option>${topicOptions.map((x) => `<option ${topic === x ? "selected" : ""}>${h(x)}</option>`).join("")}</select></div><span class="result-count">${problems.length} problems</span></div>
-      <section class="card table-card"><table class="data-table"><thead><tr><th>Problem</th><th>Status</th><th>Topics</th><th>Rating</th><th>First touched</th><th></th></tr></thead><tbody>${problems.length ? problems.map((p) => `<tr data-problem-id="${p.id}"><td class="problem-cell"><strong>${h(p.title)}</strong><span>${h(p.platform)} · ${h(p.url)}</span></td><td>${statusPill(p.state)}</td><td><div class="topic-cluster">${topicTags(p.topics)}</div></td><td class="mono">${p.rating ?? "—"}</td><td class="mono muted">${p.firstTouchedAt ? h(p.firstTouchedAt) : "—"}</td><td class="text-right"><button class="ghost" data-quick-log-problem="${p.id}">Log</button></td></tr>`).join("") : `<tr><td colspan="6" class="table-empty"><strong>一致する問題がありません</strong>検索条件を変えるか、新しい問題を記録してください。</td></tr>`}</tbody></table></section>`;
-  }
+  function renderProblems() { return stockUI.render(); }
 
   function renderReviews() {
     const today = localDateKey();
@@ -399,6 +398,7 @@
   }
 
   document.addEventListener("click", (event) => {
+    if(stockUI.handleClick(event))return;
     const routeButton = event.target.closest("[data-route]");
     if (routeButton) {
       const route = routeButton.dataset.route;
@@ -451,6 +451,7 @@
 
   document.addEventListener("submit", (event) => {
     event.preventDefault();
+    if(stockUI.handleSubmit(event))return;
     if (event.target.id === "quickLogForm") handleQuickLog(event.target);
     if (event.target.id === "eventForm") {
       const fd = new FormData(event.target);
@@ -465,13 +466,12 @@
   });
 
   document.addEventListener("input", (event) => {
-    if (event.target.id === "problemSearch") { const position=event.target.selectionStart; window.problemQuery = event.target.value; render(); const input=document.getElementById("problemSearch"); input?.focus(); input?.setSelectionRange(position,position); }
+    if(stockUI.handleInput(event))return;
     if (event.target.id === "globalSearchInput") document.getElementById("globalSearchResults").innerHTML = searchResults(event.target.value);
   });
 
   document.addEventListener("change", (event) => {
-    if (event.target.id === "problemStatusFilter") { window.problemFilter = event.target.value; render(); }
-    if (event.target.id === "problemTopicFilter") { window.topicFilter = event.target.value; render(); }
+    if(stockUI.handleChange(event))return;
     const key = event.target.dataset.setting;
     if (key) { data.settings[key] = event.target.type === "number" ? Number(event.target.value) : event.target.value; save(); showToast("設定を保存しました", `${key} を更新しました。`); }
   });

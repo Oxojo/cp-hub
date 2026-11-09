@@ -1,5 +1,6 @@
 import { createPublicKey, verify, randomBytes } from 'node:crypto';
 import { progress, recordAttempt, recordReview } from './domain.mjs';
+import { stockProblems, nextProblem, extractProblemUrls } from './problems.mjs';
 
 export function verifyDiscord(body, signature, timestamp, publicKey, now = Date.now()) {
   try {
@@ -24,14 +25,19 @@ export function discordInteraction(doc, interaction, env = process.env) {
     return nonce;
   };
   const feed = () => {
-    const p = s.problems.find(p => p.state === 'NEW');
-    if (!p) return message('未接触の候補はありません。/add で URL を登録してください。');
+    const p = nextProblem(s);
+    if (!p) return message('今日の候補は完了、または空です。Web のキューか /add で問題を追加してください。');
     const nonce = session('problem', p.id);
     return { type: 4, data: { content: `${p.title}\n${p.url}\n制約 → 素直解 → 性質 → 解法候補`, flags: 64, allowed_mentions: { parse: [] }, components: [row([button('Solved', `solve:${nonce}`, 3), button('Learned', `learn:${nonce}`, 1), button('Thinking', `think:${nonce}`), button('Unknown', `unknown:${nonce}`, 4), button('Skip', `skip:${nonce}`)])] } };
   };
   if (interaction.type === 2) {
     const name = interaction.data.name;
-    if (['today', 'progress'].includes(name)) {
+    if (interaction.data.type === 3 && name === 'ストックに追加') {
+      const target=interaction.data.resolved?.messages?.[interaction.data.target_id];
+      const urls=extractProblemUrls(target?.content);
+      if (!urls.length) reply=message('このメッセージには HTTP(S) の URL がありません。');
+      else { const result=stockProblems(s,{urls,source:'Discord メッセージ'},new Date(),'discord'); reply=message(`ストックに ${result.added} 件追加しました（重複 ${result.reused} 件）。Touched は増えません。`); }
+    } else if (['today', 'progress'].includes(name)) {
       const p = progress(s);
       reply = message(`${p.date}\nTouched ${p.touched}/${s.settings.dailyTarget} · Solved ${p.solved} · Learned ${p.learned} · Unknown ${p.unknown}\nReview ${p.due}\n${s.contests.filter(c => c.date === p.date && !c.hidden).map(c => `${c.time} ${c.name}`).join('\n')}`);
     } else if (name === 'setup') {
@@ -40,8 +46,8 @@ export function discordInteraction(doc, interaction, env = process.env) {
     } else if (name === 'problems') reply = feed();
     else if (name === 'add') {
       const url = interaction.data.options?.find(o => o.name === 'url')?.value;
-      recordAttempt(s, { url, result: 'SKIPPED', key: interaction.id });
-      reply = message('問題候補を登録しました。/problems で開始できます。');
+      const result=stockProblems(s,{urls:[url],source:'Discord /add'},new Date(),'discord');
+      reply = message(`ストックに ${result.added} 件追加しました（重複 ${result.reused} 件）。Web で今日のキューへ追加できます。`);
     } else if (name === 'contests') reply = message(s.contests.filter(c => !c.hidden).slice(0, 10).map(c => `${c.date} ${c.time} ${c.name}\n${c.url}`).join('\n') || 'コンテスト予定はありません。');
     else if (name === 'review') {
       const r = s.reviews.filter(r => r.status === 'PENDING' && r.dueDate <= progress(s).date).sort((a,b) => a.dueDate.localeCompare(b.dueDate))[0];
